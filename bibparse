@@ -1,0 +1,315 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys,os,argparse,re
+import bibtexparser
+from bibtexparser.bparser       import BibTexParser
+from bibtexparser.customization import homogeneize_latex_encoding
+
+# ==============================================================================
+
+def printhelp():
+  print(r'''
+NAME
+
+  bibparse - parse a bib-file, stripping it from unnecessary fields
+
+USAGE
+
+  $ bibparse INPUT.BIB [OUTPUT.BIB]
+
+DESCRIPTION
+
+  Parse a bib-file, stripping is from unnecessary fields. Note that is
+  "OUTPUT.BIB" is not specified, "INPUT.BIB" is overwritten.
+
+OPTIONS
+
+  -h, --help
+    Print help.
+
+  --version
+    Print version.
+
+  --duplicate-authors
+    Check the original bib-file for possible different ways in with the authors
+    are stored (e.g. de Geus, T. W. J. and de Geus, Tom W. J. would be signaled)
+
+  --ignore-case
+    Do not protect upper-case letters in the title. With this option BibTeX
+    decides, without this option the result is as specified in the bib-file.
+
+  --ignore-math
+    Skip math-mode fix. By default bibparse removes the escape characters (\)
+    and does some more fixing from inline-math ($...$).
+
+  --author-sep [STR]
+    Set character to separate authors' initials. By default, the initials are
+    not separated. For example, the default `T.W.J.\` can converted to
+    `T.~W.~.J.\` using `--author-sep="~"`.
+
+RELEASE
+
+  Version 1.2, April 2016
+
+COPYRIGHT
+
+  T.W.J. de Geus
+  tom@geus.me
+  www.geus.me
+  ''')
+
+  sys.exit(0)
+
+# ==============================================================================
+
+def printversion():
+  print('''
+Version 1.3
+  - Minor bug-fixes.
+  - Modified implementation to remove non-ascii characters from output.
+  - Removed obsolete encoding option.
+  - Added option to check input file for duplicate author storage.
+
+Version 1.2
+
+  - Minor bug-fixes.
+  - When available, the function retains at least one digital link
+    (doi, eprint, or url).
+
+Version 1.1
+
+  - Updated help
+  - Integrated "eprint".
+
+Version 1.0
+
+  - First working version.
+  ''')
+  sys.exit(0)
+
+# ==============================================================================
+
+# set options/arguments
+opts = [\
+  ((     'input'              ),dict(nargs=1  ,type=str,metavar='INPUT.BIB' )),
+  ((     'output'             ),dict(nargs='?',type=str,metavar='OUTPUT.BIB')),
+  ((     '--author-sep'       ),dict(nargs=1  ,type=str,default=['']        )),
+  (('-h','--help'             ),dict(action='store_true'                    )),
+  ((     '--version'          ),dict(action='store_true'                    )),
+  ((     '--duplicate-authors'),dict(action='store_true'                    )),
+  ((     '--ignore-case'      ),dict(action='store_true'                    )),
+  ((     '--ignore-math'      ),dict(action='store_true'                    )),
+]
+
+# parse command-line arguments
+# - catch help
+if sys.argv[1] in ['-h','--help'   ]: printhelp()
+if sys.argv[1] in [     '--version']: printversion()
+# - create parser
+ioparser = argparse.ArgumentParser(add_help=False)
+for (arg,opt) in opts:
+  if type(arg)==tuple: ioparser.add_argument(*arg,**opt)
+  else               : ioparser.add_argument( arg,**opt)
+# - execute parser / convert to "<dict>"
+args = vars(ioparser.parse_args())
+# - print help and exit
+if args['help'   ]: printhelp()
+if args['version']: printversion()
+
+# convert from list / set default
+args['author_sep'] = args['author_sep'][0]
+args['input'     ] = args['input'     ][0]
+args['output'    ] = args['output'    ] if args['output'] is not None else args['input']
+
+# check if the input-file exists
+if not os.path.isfile(args['input']):
+  raise ioparser.error('input file does not exist')
+
+# check is the file is an existing directory, otherwise convert to file with
+# name the filename of the input file
+if os.path.isdir(args['output']):
+  args['output'] = os.path.join(args['output'],os.path.split(args['input'])[-1])
+
+# ==============================================================================
+
+# list to decode certain unicode symbols to parse to LaTeX
+# NB list not exhaustive, please extend!
+decode = {
+  u'ç' : r'\c{c}',
+  u'è' : r'\`{e}',
+  u'é' : r'\'{e}',
+  u'ë' : r'\"{e}',
+  u'ö' : r'\"{o}',
+  u'ü' : r'\"{y}',
+  u'g̃' : r'\~{g}',
+  u'ñ' : r'\~{n}',
+  u'İ' : r'\.{I}',
+  u'ă' : r'\v{a}',
+  u'ř' : r'\v{r}',
+  u'–' :  '--',
+  u'—' :  '--',
+  u'“' :  '``',
+  u'”' :  "''",
+  u'×' : r'$\times$',
+}
+
+# function to do repeated substitution;
+# arguments: "func" lambda function, "txt" string)
+def repsub(func,txt):
+  n = 1
+  while n:
+    txt,n = func(txt)
+  return txt
+
+# read input-file
+parser = BibTexParser()
+bib    = bibtexparser.load(open(args['input'],'r'), parser=parser)
+
+# initiate list to check for duplicates in author storage
+dupl = {}
+
+# loop over all entries
+for entry in bib.entries:
+
+  # ----------------------------------------------------------------------------
+  # author abbreviations
+  # ----------------------------------------------------------------------------
+
+  # replace first names -> abbreviated names
+  for key in ['author','editor']:
+    if key in entry:
+      # - split authors
+      authors = entry[key].split(' and ')
+      # - loop over authors and edit
+      for i,author in enumerate(authors):
+        if len(author.split(','))>1:
+          # -- update name
+          last,first = author.split(',')
+          first      = first.replace('.','. ')
+          first      = re.sub(re.compile(r'(.*)(\(.*\))'                        ,re.UNICODE),r'\1'                         ,first)
+          first      = re.sub(re.compile(r'([A-Za-z])([\w0-9\{\}\'\"\\\.\^\{]*)',re.UNICODE),r'\1.'                        ,first)
+          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([\ ]*)'            ,re.UNICODE),r'\1'                         ,first).upper().replace(' ','')
+          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([A-Za-z])'         ,re.UNICODE),r'\1'+args['author_sep']+r'\2',first)
+          name       = last+', '+first+'\\'
+          # -- check if the author was stored in the same way before,
+          # -- if not: mark as (possible) duplicate
+          if   name   not in dupl      : dupl[name]  = [author]
+          elif author not in dupl[name]: dupl[name] += [author]
+          # -- store new name
+          authors[i] = name
+      # - store in "entry"
+      entry[key] = ' and '.join(authors)
+
+  # ----------------------------------------------------------------------------
+  # title: respect case, fix math mode
+  # ----------------------------------------------------------------------------
+
+  # modify bib-file to protect the case of the title [default]
+  if not args['ignore_case']:
+    if 'title' in entry:
+      entry['title'] = ('{'+entry['title']+'}').replace('{{{','{{').replace('}}}','}}')
+
+  # protect math mode [default]
+  if not args['ignore_math']:
+    if 'title' in entry:
+      if len(entry['title'].split('{\$}'))>=3:
+        title = entry['title']
+        title = repsub(lambda txt: re.compile(r'(\{\\\$\})(.*)(\{\\\$\})'     ,re.UNICODE).subn(r'$\2$'      ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$\$)(.*)(\$\$)'             ,re.UNICODE).subn(r'$\2$'      ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$)(.*)(\{\\{\})(.*)(\$)'    ,re.UNICODE).subn(r'\1\2{\4\5' ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$)(.*)(\{\\}\})(.*)(\$)'    ,re.UNICODE).subn(r'\1\2}\4\5' ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$)(.*)(\{\\_\})(.*)(\$)'    ,re.UNICODE).subn(r'\1\2_\4\5' ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$)(.*)(\{\\^\})(.*)(\$)'    ,re.UNICODE).subn(r'\1\2^\4\5' ,txt),title)
+        title = repsub(lambda txt: re.compile(r'(\$)(.*)(\\backslash)(.*)(\$)',re.UNICODE).subn(r'\1\2\\\4\5',txt),title)
+        entry['title'] = title
+
+  # ----------------------------------------------------------------------------
+  # basic fixing
+  # ----------------------------------------------------------------------------
+
+  # remap certain unicode symbols parsed incorrectly (see above)
+  for key in ['author','editor','title']:
+    if key in entry:
+      for inp in decode:
+        entry[key] = entry[key].replace(inp,decode[inp])
+
+  # ----------------------------------------------------------------------------
+  # remove unrelevant fields
+  # ----------------------------------------------------------------------------
+
+  # basic fields (common for all)
+  base = ['ID','ENTRYTYPE','author','title','year']
+
+  # set fields to select (if present)
+  if   entry['ENTRYTYPE']=='article'      : fields = ['journal'                        ,'volume','number','pages','doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='inproceedings': fields = ['booktitle','editor' ,'publisher','volume','number','pages','doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='book'         : fields = ['edition'  ,'editor' ,'publisher','isbn'                   ,'doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='incollection' : fields = ['booktitle','edition','publisher','isbn'                   ,'doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='phdthesis'    : fields = ['school'                         ,'isbn'                   ,'doi','eprint','url']+base
+  elif entry['ENTRYTYPE']=='techreport'   : fields = ['institution'                    ,'isbn'                   ,'doi','eprint','url']+base
+  elif entry['ENTRYTYPE']=='misc'         : fields = [                                                            'doi','eprint','url']+base
+  else: print('Undefined entry '+entry['ENTRYTYPE']); sys.exit(1)
+
+  # rename "link"->"url" ("url" is changed to "link" by bibtexparser)
+  if 'link' in entry:
+    if 'url' in entry:
+      raise IOError('Conflict between link and url')
+    entry['url'] = entry['link']
+    del entry['link']
+
+  # ensure at least one digital reference
+  if 'url' not in fields:
+    if 'doi' not in entry and 'eprint' not in entry:
+      fields.append('url')
+
+  # remove all fields that are not specified above
+  rm = [key for key in entry if key not in fields]
+  for key in rm:
+    del entry[key]
+
+  # journal abbreviations: reduce space after "." by replacing "." with ".\"
+  if 'journal' in entry:
+    entry['journal'] = entry['journal'].replace('. ','.\\ ')
+
+  # remove link if doi or eprint is available
+  if 'url' in entry and ('doi' in entry or 'eprint' in entry):
+    del entry['url']
+
+  # fix underscore problems in doi and url
+  if 'doi' in entry: entry['doi'] = entry['doi'].replace('_','\_').replace('{\\\\_}','\_').replace('{\\_}','\_').replace('{\_}','\_')
+  if 'url' in entry: entry['url'] = entry['url'].replace('{\_}','\_').replace('{\\_}','\_').replace('{~}','~').replace(r'\&','&')
+  if 'url' in entry: entry['url'] = repsub(lambda txt: re.compile(r'({)([^}])(})',re.UNICODE).subn(r'\2',txt),entry['url'])
+
+# store the reduced file
+open(args['output'],'w').write(bibtexparser.dumps(bib).encode('utf-8'))
+
+# print possible duplicates in author storage
+if args['duplicate_authors']:
+  for name in sorted(dupl):
+    if len(dupl[name])>1:
+      print '%-30s'%name,dupl[name]
+
+# ==============================================================================
+# check non-ascii characters
+# ==============================================================================
+
+import subprocess,sys
+
+if   sys.platform.startswith('linux' ): cmd = r"grep --color='auto' -P  -n '[^\x00-\x7F]' {0:s}".format(args['output'])
+elif sys.platform.startswith('darwin'): cmd = r"pcregrep --color='auto' -n '[^\x00-\x7F]' {0:s}".format(args['output'])
+
+utf = True
+
+try:
+  output = subprocess.check_output(cmd,shell=True)
+  print('The following non-ascii characters have been found:')
+  print(output)
+  print('To view with colors, run:')
+  print('$ {0:s}'.format(cmd))
+except subprocess.CalledProcessError as grepexc:
+  if   grepexc.returncode==1: utf = False # no matches were found
+  elif grepexc.returncode >1: raise RuntimeError(grepexc.output)
+
+if not utf:
+  open(args['output'],'w').write(bibtexparser.dumps(bib))
