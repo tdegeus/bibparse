@@ -35,6 +35,9 @@ OPTIONS
     Check the original bib-file for possible different ways in with the authors
     are stored (e.g. de Geus, T. W. J. and de Geus, Tom W. J. would be signaled)
 
+  --check-keys
+    Check citation keys for first author + year construction.
+
   --ignore-case
     Do not protect upper-case letters in the title. With this option BibTeX
     decides, without this option the result is as specified in the bib-file.
@@ -98,6 +101,7 @@ opts = [\
   (('-h','--help'             ),dict(action='store_true'                    )),
   ((     '--version'          ),dict(action='store_true'                    )),
   ((     '--duplicate-authors'),dict(action='store_true'                    )),
+  ((     '--check-keys'       ),dict(action='store_true'                    )),
   ((     '--ignore-case'      ),dict(action='store_true'                    )),
   ((     '--ignore-math'      ),dict(action='store_true'                    )),
 ]
@@ -168,6 +172,8 @@ bib    = bibtexparser.load(open(args['input'],'r'), parser=parser)
 
 # initiate list to check for duplicates in author storage
 dupl = {}
+# initiate dictionary to check the citation keys
+keys = {}
 
 # loop over all entries
 for entry in bib.entries:
@@ -235,6 +241,50 @@ for entry in bib.entries:
         entry[key] = entry[key].replace(inp,decode[inp])
 
   # ----------------------------------------------------------------------------
+  # auto-construct citation key
+  # ----------------------------------------------------------------------------
+
+  if args['check_keys']:
+
+    # functions to replace accents to letters
+    repl = [\
+      lambda name: re.sub(r"([a-zA-Z]?)(\{\\[a-z\~\'\"\`]\{)([a-zA-Z])(\}\})([a-zA-Z]?)",r'\1\3\5',name),\
+      lambda name: re.sub(r"([a-zA-Z]?)(\\[a-z\~\'\"\`]\{)([a-zA-Z])(\})([a-zA-Z]?)"    ,r'\1\3\5',name),\
+      lambda name: name.replace(r'{\o}' ,'o'),\
+      lambda name: name.replace(r'{\aa}','a'),\
+    ]
+
+    # select author, and if not present editor
+    if 'author'   in entry:
+      key = 'author'
+    elif 'editor' in entry:
+      key = 'editor'
+
+    # no author/editor -> no default construction
+    if not (key in entry and 'year' in entry):
+      keys[entry['ID']] = entry['ID']
+    # default construction
+    else:
+      authors = entry[key].split(' and ')
+      if len(authors[0].split(','))>1:
+        # use last name of first author
+        last,_ = authors[0].split(',')
+        # remove string
+        last = last.replace(' ','')
+        # remove accents
+        for func in repl:
+          while last!=func(last):
+            last = func(last)
+        # remove case-force for BibTeX
+        last = re.sub(r'(.*)(\{)(.*)(\})(.*)',r'\1\3\5',last)
+        # remove accent
+        last = last.replace("'",'')
+        # force first latter to be upper-case
+        last = last[0].upper()+last[1:]
+        # store constructed key
+        keys[entry['ID']] = last+entry['year']
+
+  # ----------------------------------------------------------------------------
   # remove unrelevant fields
   # ----------------------------------------------------------------------------
 
@@ -289,6 +339,31 @@ if args['duplicate_authors']:
   for name in sorted(dupl):
     if len(dupl[name])>1:
       print '%-30s'%name,dupl[name]
+
+# print possible key changes
+if args['check_keys']:
+
+  # append citation keys with "a", "b", "c", etc. in the case of new duplicates
+  appendix = ['','a','b','c','d','e','f','g','h','i']
+  newkeys  = [keys[key] for key in sorted(keys)]
+  for key in sorted(keys):
+    for ex in appendix[1:]:
+      if key[-1]==ex:
+        for letter in appendix:
+          if keys[key]+letter not in newkeys:
+            keys[key] = keys[key]+letter
+            newkeys   = [keys[key] for key in sorted(keys)]
+            break
+
+  # print changes
+  N = 0
+  for key in keys:
+    if key!=keys[key]:
+      N = max(N,len(key))
+  for key in sorted(keys):
+    if key!=keys[key]:
+      print(('{0:'+str(N)+'} -> '+'{1:'+str(N)+'}').format(key,keys[key]))
+
 
 # ==============================================================================
 # check non-ascii characters
