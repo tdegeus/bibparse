@@ -53,7 +53,7 @@ OPTIONS
 
 RELEASE
 
-  Version 1.2, April 2016
+  Version 1.3.1
 
 COPYRIGHT
 
@@ -68,24 +68,27 @@ COPYRIGHT
 
 def printversion():
   print('''
-Version 1.3
+Version 1.3.1, April 2017
+  - Implemented "--check-keys" option.
+
+Version 1.3.0
   - Minor bug-fixes.
   - Modified implementation to remove non-ascii characters from output.
   - Removed obsolete encoding option.
   - Added option to check input file for duplicate author storage.
 
-Version 1.2
+Version 1.2.0
 
   - Minor bug-fixes.
   - When available, the function retains at least one digital link
     (doi, eprint, or url).
 
-Version 1.1
+Version 1.1.0
 
   - Updated help
   - Integrated "eprint".
 
-Version 1.0
+Version 1.0.0
 
   - First working version.
   ''')
@@ -362,7 +365,7 @@ if args['check_keys']:
       N = max(N,len(key))
   for key in sorted(keys):
     if key!=keys[key]:
-      print(('{0:'+str(N)+'} -> '+'{1:'+str(N)+'}').format(key,keys[key]))
+      print(('{0:'+str(N)+'s} -> '+'{1:s}').format(key,keys[key]))
 
 
 # ==============================================================================

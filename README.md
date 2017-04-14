@@ -31,3 +31,7 @@ bibparse --help
     Set character to separate authors' initials. By default, the initials are
     not separated. For example, the default `T.W.J.\` can converted to
     `T.~W.~.J.\` using `--author-sep="~"`.
+
+*   `--check-keys`
+
+    Check citation keys for first author + year construction.
