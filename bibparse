@@ -32,11 +32,16 @@ OPTIONS
     Print version.
 
   --duplicate-authors
-    Check the original bib-file for possible different ways in with the authors
-    are stored (e.g. de Geus, T. W. J. and de Geus, Tom W. J. would be signaled)
+    Check if the same authors are stored differently in the input BibTeX file.
+    `bibparse` will check which authors are converted to the same 'cleaned'
+    author name. This option does not influence the result, but does provide
+    information to manage the input BibTeX file.
 
   --check-keys
-    Check citation keys for first author + year construction.
+    Check citation keys for first author + year construction. The keys that are
+    not matching this construction are printed to the screen (excluding `@misc`
+    entries). This option does not influence the result, but does provide
+    information to manage the input BibTeX file.
 
   --ignore-case
     Do not protect upper-case letters in the title. With this option BibTeX
