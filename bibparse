@@ -31,7 +31,7 @@ Copyright:
 # ==============================================================================
 
 from docopt import docopt
-import os,re
+import os,re,sys
 import bibtexparser
 from bibtexparser.bparser       import BibTexParser
 from bibtexparser.customization import homogeneize_latex_encoding
