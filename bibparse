@@ -165,6 +165,7 @@ for entry in bib.entries:
   if   entry['ENTRYTYPE']=='article'      : fields = ['journal'                        ,'volume','number','pages','doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='inproceedings': fields = ['booktitle','editor' ,'publisher','volume','number','pages','doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='book'         : fields = ['edition'  ,'editor' ,'publisher','isbn'                   ,'doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='inbook'       : fields = ['edition'  ,'editor' ,'publisher','isbn'                   ,'doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='incollection' : fields = ['booktitle','edition','publisher','isbn'                   ,'doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='phdthesis'    : fields = ['school'                         ,'isbn'                   ,'doi','eprint','url']+base
   elif entry['ENTRYTYPE']=='techreport'   : fields = ['institution'                    ,'isbn'                   ,'doi','eprint','url']+base
