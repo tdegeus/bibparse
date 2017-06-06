@@ -1,147 +1,54 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+"""bibparse
+  Parse a BibTeX library, stripping it from unnecessary fields, and unifying
+  the formatting of authors. Additionally this script can be used to perform
+  some basic checking of the library.
 
-import sys,os,argparse,re
+Usage:
+  bibparse [options] <input> <output>
+
+Arguments:
+  input               Input BibTeX-file.
+  output              Output file, or path (the "input" file-name is copied).
+
+Options:
+  -h --help           Show help.
+  --version           Show version.
+  --author-sep=<str>  Character to separate authors' initials. [default: ]
+  --ignore-case       Do not protect case of title.
+  --ignore-math       Do not apply math-mode fix.
+
+Checks:
+  --check-authors     Check for duplicate authors.
+  --check-keys        Check keys for author + year construction.
+
+Copyright:
+  T.W.J. de Geus
+  tom@geus.me
+  www.geus.me
+"""
+
+# ==============================================================================
+
+from docopt import docopt
+import os,re
 import bibtexparser
 from bibtexparser.bparser       import BibTexParser
 from bibtexparser.customization import homogeneize_latex_encoding
 
 # ==============================================================================
 
-def printhelp():
-  print(r'''
-NAME
-
-  bibparse - parse a bib-file, stripping it from unnecessary fields
-
-USAGE
-
-  $ bibparse INPUT.BIB [OUTPUT.BIB]
-
-DESCRIPTION
-
-  Parse a bib-file, stripping is from unnecessary fields. Note that is
-  "OUTPUT.BIB" is not specified, "INPUT.BIB" is overwritten.
-
-OPTIONS
-
-  -h, --help
-    Print help.
-
-  --version
-    Print version.
-
-  --duplicate-authors
-    Check if the same authors are stored differently in the input BibTeX file.
-    `bibparse` will check which authors are converted to the same 'cleaned'
-    author name. This option does not influence the result, but does provide
-    information to manage the input BibTeX file.
-
-  --check-keys
-    Check citation keys for first author + year construction. The keys that are
-    not matching this construction are printed to the screen (excluding `@misc`
-    entries). This option does not influence the result, but does provide
-    information to manage the input BibTeX file.
-
-  --ignore-case
-    Do not protect upper-case letters in the title. With this option BibTeX
-    decides, without this option the result is as specified in the bib-file.
-
-  --ignore-math
-    Skip math-mode fix. By default bibparse removes the escape characters (\)
-    and does some more fixing from inline-math ($...$).
-
-  --author-sep [STR]
-    Set character to separate authors' initials. By default, the initials are
-    not separated. For example, the default `T.W.J.\` can converted to
-    `T.~W.~.J.\` using `--author-sep="~"`.
-
-RELEASE
-
-  Version 1.3.1
-
-COPYRIGHT
-
-  T.W.J. de Geus
-  tom@geus.me
-  www.geus.me
-  ''')
-
-  sys.exit(0)
-
-# ==============================================================================
-
-def printversion():
-  print('''
-Version 1.3.1, April 2017
-  - Implemented "--check-keys" option.
-
-Version 1.3.0
-  - Minor bug-fixes.
-  - Modified implementation to remove non-ascii characters from output.
-  - Removed obsolete encoding option.
-  - Added option to check input file for duplicate author storage.
-
-Version 1.2.0
-
-  - Minor bug-fixes.
-  - When available, the function retains at least one digital link
-    (doi, eprint, or url).
-
-Version 1.1.0
-
-  - Updated help
-  - Integrated "eprint".
-
-Version 1.0.0
-
-  - First working version.
-  ''')
-  sys.exit(0)
-
-# ==============================================================================
-
-# set options/arguments
-opts = [\
-  ((     'input'              ),dict(nargs=1  ,type=str,metavar='INPUT.BIB' )),
-  ((     'output'             ),dict(nargs='?',type=str,metavar='OUTPUT.BIB')),
-  ((     '--author-sep'       ),dict(nargs=1  ,type=str,default=['']        )),
-  (('-h','--help'             ),dict(action='store_true'                    )),
-  ((     '--version'          ),dict(action='store_true'                    )),
-  ((     '--duplicate-authors'),dict(action='store_true'                    )),
-  ((     '--check-keys'       ),dict(action='store_true'                    )),
-  ((     '--ignore-case'      ),dict(action='store_true'                    )),
-  ((     '--ignore-math'      ),dict(action='store_true'                    )),
-]
-
-# parse command-line arguments
-# - catch help
-if sys.argv[1] in ['-h','--help'   ]: printhelp()
-if sys.argv[1] in [     '--version']: printversion()
-# - create parser
-ioparser = argparse.ArgumentParser(add_help=False)
-for (arg,opt) in opts:
-  if type(arg)==tuple: ioparser.add_argument(*arg,**opt)
-  else               : ioparser.add_argument( arg,**opt)
-# - execute parser / convert to "<dict>"
-args = vars(ioparser.parse_args())
-# - print help and exit
-if args['help'   ]: printhelp()
-if args['version']: printversion()
-
-# convert from list / set default
-args['author_sep'] = args['author_sep'][0]
-args['input'     ] = args['input'     ][0]
-args['output'    ] = args['output'    ] if args['output'] is not None else args['input']
+# parse command-line options/arguments
+args = docopt(__doc__,version='1.3.1')
 
 # check if the input-file exists
-if not os.path.isfile(args['input']):
-  raise ioparser.error('input file does not exist')
+if not os.path.isfile(args['<input>']):
+  raise IOError('<input> file does not exist')
 
 # check is the file is an existing directory, otherwise convert to file with
 # name the filename of the input file
-if os.path.isdir(args['output']):
-  args['output'] = os.path.join(args['output'],os.path.split(args['input'])[-1])
+if os.path.isdir(args['<output>']):
+  args['<output>'] = os.path.join(args['<output>'],os.path.split(args['<input>'])[-1])
 
 # ==============================================================================
 
@@ -167,7 +74,7 @@ decode = {
 }
 
 # function to do repeated substitution;
-# arguments: "func" lambda function, "txt" string)
+# arguments: "func" = lambda function, "txt" = string)
 def repsub(func,txt):
   n = 1
   while n:
@@ -176,11 +83,10 @@ def repsub(func,txt):
 
 # read input-file
 parser = BibTexParser()
-bib    = bibtexparser.load(open(args['input'],'r'), parser=parser)
+bib    = bibtexparser.load(open(args['<input>'],'r'), parser=parser)
 
-# initiate list to check for duplicates in author storage
+# initiate list to check for duplicates in author storage, and the citation keys
 dupl = {}
-# initiate dictionary to check the citation keys
 keys = {}
 
 # loop over all entries
@@ -201,10 +107,10 @@ for entry in bib.entries:
           # -- update name
           last,first = author.split(',')
           first      = first.replace('.','. ')
-          first      = re.sub(re.compile(r'(.*)(\(.*\))'                        ,re.UNICODE),r'\1'                         ,first)
-          first      = re.sub(re.compile(r'([A-Za-z])([\w0-9\{\}\'\"\\\.\^\{]*)',re.UNICODE),r'\1.'                        ,first)
-          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([\ ]*)'            ,re.UNICODE),r'\1'                         ,first).upper().replace(' ','')
-          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([A-Za-z])'         ,re.UNICODE),r'\1'+args['author_sep']+r'\2',first)
+          first      = re.sub(re.compile(r'(.*)(\(.*\))'                        ,re.UNICODE),r'\1'                           ,first)
+          first      = re.sub(re.compile(r'([A-Za-z])([\w0-9\{\}\'\"\\\.\^\{]*)',re.UNICODE),r'\1.'                          ,first)
+          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([\ ]*)'            ,re.UNICODE),r'\1'                           ,first).upper().replace(' ','')
+          first      = re.sub(re.compile(r'([A-Za-z\.][\-]?)([A-Za-z])'         ,re.UNICODE),r'\1'+args['--author-sep']+r'\2',first)
           name       = last+', '+first+'\\'
           # -- check if the author was stored in the same way before,
           # -- if not: mark as (possible) duplicate
@@ -220,12 +126,12 @@ for entry in bib.entries:
   # ----------------------------------------------------------------------------
 
   # modify bib-file to protect the case of the title [default]
-  if not args['ignore_case']:
+  if not args['--ignore-case']:
     if 'title' in entry:
       entry['title'] = ('{'+entry['title']+'}').replace('{{{','{{').replace('}}}','}}')
 
   # protect math mode [default]
-  if not args['ignore_math']:
+  if not args['--ignore-math']:
     if 'title' in entry:
       if len(entry['title'].split('{\$}'))>=3:
         title = entry['title']
@@ -247,50 +153,6 @@ for entry in bib.entries:
     if key in entry:
       for inp in decode:
         entry[key] = entry[key].replace(inp,decode[inp])
-
-  # ----------------------------------------------------------------------------
-  # auto-construct citation key
-  # ----------------------------------------------------------------------------
-
-  if args['check_keys']:
-
-    # functions to replace accents to letters
-    repl = [\
-      lambda name: re.sub(r"([a-zA-Z]?)(\{\\[a-z\~\'\"\`]\{)([a-zA-Z])(\}\})([a-zA-Z]?)",r'\1\3\5',name),\
-      lambda name: re.sub(r"([a-zA-Z]?)(\\[a-z\~\'\"\`]\{)([a-zA-Z])(\})([a-zA-Z]?)"    ,r'\1\3\5',name),\
-      lambda name: name.replace(r'{\o}' ,'o'),\
-      lambda name: name.replace(r'{\aa}','a'),\
-    ]
-
-    # select author, and if not present editor
-    if 'author'   in entry:
-      key = 'author'
-    elif 'editor' in entry:
-      key = 'editor'
-
-    # no author/editor -> no default construction
-    if not (key in entry and 'year' in entry):
-      keys[entry['ID']] = entry['ID']
-    # default construction
-    else:
-      authors = entry[key].split(' and ')
-      if len(authors[0].split(','))>1:
-        # use last name of first author
-        last,_ = authors[0].split(',')
-        # remove string
-        last = last.replace(' ','')
-        # remove accents
-        for func in repl:
-          while last!=func(last):
-            last = func(last)
-        # remove case-force for BibTeX
-        last = re.sub(r'(.*)(\{)(.*)(\})(.*)',r'\1\3\5',last)
-        # remove accent
-        last = last.replace("'",'')
-        # force first latter to be upper-case
-        last = last[0].upper()+last[1:]
-        # store constructed key
-        keys[entry['ID']] = last+entry['year']
 
   # ----------------------------------------------------------------------------
   # remove unrelevant fields
@@ -339,17 +201,73 @@ for entry in bib.entries:
   if 'url' in entry: entry['url'] = entry['url'].replace('{\_}','\_').replace('{\\_}','\_').replace('{~}','~').replace(r'\&','&')
   if 'url' in entry: entry['url'] = repsub(lambda txt: re.compile(r'({)([^}])(})',re.UNICODE).subn(r'\2',txt),entry['url'])
 
-# store the reduced file
-open(args['output'],'w').write(bibtexparser.dumps(bib).encode('utf-8'))
+  # ----------------------------------------------------------------------------
+  # auto-construct citation key
+  # ----------------------------------------------------------------------------
 
+  if args['--check-keys']:
+
+    # functions to replace accents to letters
+    repl = [\
+      lambda name: re.sub(r"([a-zA-Z]?)(\{\\[a-z\~\'\"\`]\{)([a-zA-Z])(\}\})([a-zA-Z]?)",r'\1\3\5',name),\
+      lambda name: re.sub(r"([a-zA-Z]?)(\\[a-z\~\'\"\`]\{)([a-zA-Z])(\})([a-zA-Z]?)"    ,r'\1\3\5',name),\
+      lambda name: name.replace(r'{\o}' ,'o'),\
+      lambda name: name.replace(r'{\aa}','a'),\
+    ]
+
+    # select author, and if not present editor
+    if   'author' in entry: key = 'author'
+    elif 'editor' in entry: key = 'editor'
+
+    # no author/editor -> no default construction
+    if not (key in entry and 'year' in entry):
+      keys[entry['ID']] = entry['ID']
+    # default construction
+    else:
+      authors = entry[key].split(' and ')
+      if len(authors[0].split(','))>1:
+        # use last name (without spaces) of first author
+        last,_ = authors[0].split(',')
+        last   = last.replace(' ','')
+        # remove accents from characters
+        for func in repl:
+          while last!=func(last):
+            last = func(last)
+        # remove case-force for BibTeX
+        last = re.sub(r'(.*)(\{)(.*)(\})(.*)',r'\1\3\5',last)
+        # remove accent
+        last = last.replace("'",'')
+        # force first letter to be upper-case
+        last = last[0].upper()+last[1:]
+        # store constructed key
+        keys[entry['ID']] = last+entry['year']
+
+# end for entry in bib.entries:
+
+# store the reduced file
+open(args['<output>'],'w').write(bibtexparser.dumps(bib))
+
+# ==============================================================================
 # print possible duplicates in author storage
-if args['duplicate_authors']:
+# ==============================================================================
+
+if args['--check-authors']:
+  # - read length of longest name, to align in columns
+  N = 0
   for name in sorted(dupl):
     if len(dupl[name])>1:
-      print '%-30s'%name,dupl[name]
+      N = max(N,len(name))
+  fmt = '%-'+str(N)+'s'
+  # - print
+  for name in sorted(dupl):
+    if len(dupl[name])>1:
+      print(fmt%name,dupl[name])
 
+# ==============================================================================
 # print possible key changes
-if args['check_keys']:
+# ==============================================================================
+
+if args['--check-keys']:
 
   # append citation keys with "a", "b", "c", etc. in the case of new duplicates
   appendix = ['','a','b','c','d','e','f','g','h','i']
@@ -371,28 +289,3 @@ if args['check_keys']:
   for key in sorted(keys):
     if key!=keys[key]:
       print(('{0:'+str(N)+'s} -> '+'{1:s}').format(key,keys[key]))
-
-
-# ==============================================================================
-# check non-ascii characters
-# ==============================================================================
-
-import subprocess,sys
-
-if   sys.platform.startswith('linux' ): cmd = r"grep --color='auto' -P  -n '[^\x00-\x7F]' {0:s}".format(args['output'])
-elif sys.platform.startswith('darwin'): cmd = r"pcregrep --color='auto' -n '[^\x00-\x7F]' {0:s}".format(args['output'])
-
-utf = True
-
-try:
-  output = subprocess.check_output(cmd,shell=True)
-  print('The following non-ascii characters have been found:')
-  print(output)
-  print('To view with colors, run:')
-  print('$ {0:s}'.format(cmd))
-except subprocess.CalledProcessError as grepexc:
-  if   grepexc.returncode==1: utf = False # no matches were found
-  elif grepexc.returncode >1: raise RuntimeError(grepexc.output)
-
-if not utf:
-  open(args['output'],'w').write(bibtexparser.dumps(bib))
