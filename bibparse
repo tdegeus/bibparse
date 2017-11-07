@@ -17,6 +17,7 @@ Options:
   --author-sep=<str>  Character to separate authors' initials. [default: ]
   --ignore-case       Do not protect case of title.
   --ignore-math       Do not apply math-mode fix.
+  --doi-to-url        Convert doi to url.
 
 Checks:
   --check-authors     Check for duplicate authors.
@@ -201,6 +202,11 @@ for entry in bib.entries:
   if 'doi' in entry: entry['doi'] = entry['doi'].replace('_','\_').replace('{\\\\_}','\_').replace('{\\_}','\_').replace('{\_}','\_')
   if 'url' in entry: entry['url'] = entry['url'].replace('{\_}','\_').replace('{\\_}','\_').replace('{~}','~').replace(r'\&','&')
   if 'url' in entry: entry['url'] = repsub(lambda txt: re.compile(r'({)([^}])(})',re.UNICODE).subn(r'\2',txt),entry['url'])
+
+  # Parse DOI into an URL
+  if '--doi-to-url' in args and 'doi' in entry:
+    entry['url'] = 'http://dx.doi.org/' + entry['doi']
+    del entry['doi']
 
   # ----------------------------------------------------------------------------
   # auto-construct citation key
