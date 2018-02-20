@@ -163,6 +163,7 @@ for entry in bib.entries:
 
   # set fields to select (if present)
   if   entry['ENTRYTYPE']=='article'      : fields = ['journal'                        ,'volume','number','pages','doi','eprint'      ]+base
+  elif entry['ENTRYTYPE']=='unpublished'  : fields = [                                                            'doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='inproceedings': fields = ['booktitle','editor' ,'publisher','volume','number','pages','doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='book'         : fields = ['edition'  ,'editor' ,'publisher','isbn'                   ,'doi','eprint'      ]+base
   elif entry['ENTRYTYPE']=='inbook'       : fields = ['edition'  ,'editor' ,'publisher','isbn'                   ,'doi','eprint'      ]+base
