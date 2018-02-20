@@ -31,5 +31,5 @@ bibparse --help
 `bibparse` depends on `bibtexparser`. Install this Python module using: 
 
 ```bash
-pip install bibtexparse
+pip install bibtexparser
 ```
