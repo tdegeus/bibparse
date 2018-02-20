@@ -28,8 +28,8 @@ bibparse --help
 
 ## Dependencies
 
-`bibparse` depends on `bibtexparser`. Install this Python module using: 
+`bibparse` depends on Python3 and its `bibtexparser` module. Install this Python3 module using: 
 
 ```bash
-pip install bibtexparser
+pip3 install bibtexparser
 ```
