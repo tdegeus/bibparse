@@ -1,3 +1,5 @@
+**THIS FUNCTIONALITY HAS BEEN MOVED TO https://github.com/tdegeus/GooseBib. In time this respository will be removed**
+
 # bibparse
 
 Parse a BibTeX file to a cleaner version in which only the relevant fields are stored. Also, the names of authors are uniformly stored.
